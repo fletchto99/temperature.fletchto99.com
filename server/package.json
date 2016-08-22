@@ -1,0 +1,20 @@
+{
+  "name": "temperature-sensor",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.14.0",
+    "express-ws": "^2.0.0-rc.1",
+    "feels": "^2.0.0",
+    "momentjs": "^1.1.14",
+    "mysql": "^2.11.1",
+    "node-dht-sensor": "0.0.12",
+    "onoff": "^1.1.1"
+  }
+}

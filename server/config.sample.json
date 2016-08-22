@@ -1,0 +1,18 @@
+{
+    "sensor": {
+        "gpio": 4,
+        "time": 10000
+    },
+    "LED": {
+        "gpio": 17
+    },
+    "server" : {
+        "port": 2200
+    },
+    "database": {
+        "host": "localhost",
+        "user": "username",
+        "password": "password",
+        "database": "Temperature"
+    }
+}
