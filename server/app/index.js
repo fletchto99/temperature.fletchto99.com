@@ -38,6 +38,14 @@ app.get('/feels_like/', (req, res) => {
     res.send(day[day.length-1].feels_like.toString());
 });
 
+app.get('/humidity/', (req, res) => {
+    res.send(day[day.length-1].humidity.toString());
+});
+
+app.get('/temperature/', (req, res) => {
+    res.send(day[day.length-1].temperature.toString());
+});
+
 app.ws('/', function (client, req) {
     database.maxMin((err, results) => {
         if (err) {
