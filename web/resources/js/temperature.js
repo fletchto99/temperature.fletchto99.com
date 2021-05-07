@@ -1,11 +1,5 @@
 window.onload = function() {
 
-    var config = {
-        API_URL: "wss://temperature.fletchto99.com/api/"
-    };
-
-    var maxmin = null;
-
     var chart = c3.generate({
         bindto: '#chart',
         data: {
@@ -30,7 +24,6 @@ window.onload = function() {
                 height: 800
             }
         },
-        //TODO: c and % formatting for tooltip
         axis: {
             x: {
                 type: 'timeseries',
@@ -74,10 +67,18 @@ window.onload = function() {
         }
     });
 
-    var socket = new WebSocket(config.API_URL);
+    let set_extreme = (type, extreme, value, delimiter, date) => {
+        document.getElementById(`${type}${extreme}`).innerText = `${type} ${extreme} of ${value}${delimiter} recorded on ${new Date(date).toLocaleString()}`
+    }
+
+    let socket = new WebSocket("wss://temperature.fletchto99.com/api/");
+    let max_temp = null;
+    let min_temp = null;
+    let max_humid = null;
+    let min_humid = null;
+
 
     socket.onmessage = function (message) {
-
         var msg = JSON.parse(message.data);
 
         if (msg.message == 'update') {
@@ -88,39 +89,53 @@ window.onload = function() {
                     ['feels_like', msg.data.feels_like],
                     ['humidity', msg.data.humidity]
                 ],
-                length: (chart.data.values('temperature').length > 200) ? 1 : 0
+                length: (chart.data.values('temperature').length > 50) ? 1 : 0
             });
 
-            document.title = 'Hot as Balls (' + msg.data.feels_like + ')';
+            document.title = `${msg.data.feels_like} / ${msg.data.humidity}`;
 
-            //TODO: check if a new max/min has been achieved
-
-        } else if (msg.message == 'halfhour'){
-            if (msg.data.length > 200) {
-                msg.data = msg.data.slice(-200);
+            if (msg.data.temperature > max_temp.temperature) {
+                set_extreme("Max", "temperature", msg.data.temperature, "c", msg.data.time)
             }
-            document.title = 'Hot as Balls (' + msg.data[msg.data.length-1].feels_like + ')';
+
+            if (msg.data.temperature < min_timp.temperature) {
+                set_extreme("Min", "temperature", msg.data.temperature, "c", msg.data.time)
+            }
+
+            if (msg.data.humidity > max_humid.humidity) {
+                set_extreme("Max", "humidity", msg.data.humidity, "%", msg.data.time)
+            }
+
+            if (msg.data.humidity < min_humid.humidity) {
+                set_extreme("Min", "humidity", msg.data.humidity, "%", msg.data.time)
+            }
+
+        } else if (msg.message == 'initialize') {
+            max_temp = msg.data["extremes"][0][0]
+            min_temp = msg.data["extremes"][1][0]
+            max_humid = msg.data["extremes"][2][0]
+            min_humid = msg.data["extremes"][3][0]
+            set_extreme("Max", "temperature", max_temp.temperature, "c", max_temp.time_recorded)
+            set_extreme("Min", "temperature", min_temp.temperature, "c", min_temp.time_recorded)
+            set_extreme("Max", "humidity", max_humid.humidity, "%", max_humid.time_recorded)
+            set_extreme("Min", "humidity", min_humid.humidity, "%", min_humid.time_recorded)
+
             chart.load({
                 columns: [
-                    ['time'].concat(msg.data.map(function (item) {
+                    ['time'].concat(msg.data.values.map(function (item) {
                         return item.timestamp
                     })),
-                    ['temperature'].concat(msg.data.map(function (item) {
+                    ['temperature'].concat(msg.data.values.map(function (item) {
                         return item.temperature
                     })),
-                    ['feels_like'].concat(msg.data.map(function (item) {
+                    ['feels_like'].concat(msg.data.values.map(function (item) {
                         return item.feels_like;
                     })),
-                    ['humidity'].concat(msg.data.map(function (item) {
+                    ['humidity'].concat(msg.data.values.map(function (item) {
                         return item.humidity
                     }))
                 ]
-            });
-        } else if (msg.message == 'maxmin') {
-            document.getElementById('maxtemp').innerText = "Max temp recorded: " + msg.data[0][0].temperature + "c on " + (new Date(msg.data[0][0].time_recorded)).toLocaleString();
-            document.getElementById('mintemp').innerText = "Min temp recorded: " + msg.data[1][0].temperature + "c on " + (new Date(msg.data[1][0].time_recorded)).toLocaleString();
-            document.getElementById('maxhumid').innerText = "Max humidity recorded: " + msg.data[2][0].humidity + "% on " + (new Date(msg.data[2][0].time_recorded)).toLocaleString();
-            document.getElementById('minhumid').innerText = "Min humidity recorded: " + msg.data[3][0].humidity + "% on " + (new Date(msg.data[3][0].time_recorded)).toLocaleString();
+            })
         }
     }
 };

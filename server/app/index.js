@@ -1,15 +1,15 @@
 const express = require('express');
 const app = express();
-const expressWs = require('express-ws')(app);
+const socket = require('express-ws')(app);
 const moment = require('moment');
 const Feels = require('feels');
 const sensor = require('./sensor');
 const database = require('./database');
 const config = require('../config.json');
 
-const day  = [];
+const cache = [];
 
-let main = () => {
+let loop = () => {
     let result = sensor.read();
 
     if (result.isValid) {
@@ -19,52 +19,48 @@ let main = () => {
             humidity: Math.round(result.humidity * 100) / 100,
             feels_like: Math.round(new Feels({temp: result.temperature, humidity: result.humidity}).humidex() * 100) / 100
         };
-        expressWs.getWss().clients.forEach((client) => {
+        socket.getWss().clients.forEach((client) => {
             client.send(JSON.stringify({
                 message: 'update',
                 data: values
             }));
         });
-        database.storeTemperatureAndHumidity(result.temperature, result.humidity);
-        if (day.length > (86400000 / config.sensor.time)) {
-            day.shift();
+        database.store(result.temperature, result.humidity);
+        cache.push(values)
+        if (cache.len > 50) {
+            cache.shift()
         }
-        day.push(values)
     }
 };
 
-
-app.get('/feels_like/', (req, res) => {
-    res.send(day[day.length-1].feels_like.toString());
+app.get('/feels_like', (req, res) => {
+    res.send(cache[cache.length-1].feels_like.toString());
 });
 
-app.get('/humidity/', (req, res) => {
-    res.send(day[day.length-1].humidity.toString());
+app.get('/humidity', (req, res) => {
+    res.send(cache[cache.length-1].humidity.toString());
 });
 
-app.get('/temperature/', (req, res) => {
-    res.send(day[day.length-1].temperature.toString());
+app.get('/temperature', (req, res) => {
+    res.send(cache[cache.length-1].temperature.toString());
 });
 
 app.ws('/', function (client, req) {
-    database.maxMin((err, results) => {
+    database.fetch_extremes((err, results) => {
         if (err) {
             return;
         }
         client.send(JSON.stringify({
-            message: 'maxmin',
-            data: results
+            message: 'initialize',
+            data: {
+                extremes: results,
+                values: cache
+            }
         }));
     });
-
-    client.send(JSON.stringify({
-        message: 'halfhour',
-        data: day
-    }));
 });
 
 app.listen(config.server.port, () => {
     console.log(`Server ready!`);
-    main();
-    setInterval(main, 5000);
+    setInterval(loop, 30000);
 });
