@@ -19,7 +19,7 @@ module.exports = {
         temperature = parseFloat(temperature);
         humidity = parseFloat(humidity);
 
-        connection.query('INSERT INTO Temperature SET ? ', {
+        connection.query('INSERT INTO temperature SET ? ', {
             temperature: temperature,
             humidity: humidity
         }, (err) => {
@@ -31,10 +31,10 @@ module.exports = {
 
     fetch_extremes(callback) {
         let query = `
-            SELECT time_recorded, humidity, temperature FROM Temperature ORDER BY Temperature desc LIMIT 1;
-            SELECT time_recorded, humidity, temperature FROM Temperature ORDER BY Temperature asc LIMIT 1;
-            SELECT time_recorded, humidity, temperature FROM Temperature ORDER BY Humidity desc LIMIT 1;
-            SELECT time_recorded, humidity, temperature FROM Temperature ORDER BY Humidity asc LIMIT 1;
+            SELECT time_recorded, humidity, temperature FROM temperature ORDER BY temperature desc LIMIT 1;
+            SELECT time_recorded, humidity, temperature FROM temperature ORDER BY temperature asc LIMIT 1;
+            SELECT time_recorded, humidity, temperature FROM temperature ORDER BY humidity desc LIMIT 1;
+            SELECT time_recorded, humidity, temperature FROM temperature ORDER BY humidity asc LIMIT 1;
         `
 
         connection.query(query, (err, result) => {
