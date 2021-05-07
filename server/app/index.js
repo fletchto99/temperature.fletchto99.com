@@ -27,7 +27,7 @@ let loop = () => {
         });
         database.store(result.temperature, result.humidity);
         cache.push(values)
-        if (cache.len > 50) {
+        if (cache.length > 50) {
             cache.shift()
         }
     }
