@@ -98,7 +98,7 @@ window.onload = function() {
                 set_extreme("Max", "temperature", msg.data.temperature, "c", msg.data.time)
             }
 
-            if (msg.data.temperature < min_timp.temperature) {
+            if (msg.data.temperature < min_temp.temperature) {
                 set_extreme("Min", "temperature", msg.data.temperature, "c", msg.data.time)
             }
 
