@@ -7,7 +7,7 @@ const sensor = require('./sensor');
 const database = require('./database');
 const config = require('../config.json');
 
-const cache = [];
+let cache = []
 
 let loop = () => {
     let result = sensor.read();
@@ -48,6 +48,8 @@ app.get('/temperature', (req, res) => {
 app.ws('/', function (client, req) {
     database.fetch_extremes((err, results) => {
         if (err) {
+            console.log("Coulnt fetch extremes")
+            console.log(err)
             return;
         }
         client.send(JSON.stringify({
@@ -60,7 +62,22 @@ app.ws('/', function (client, req) {
     });
 });
 
-app.listen(config.server.port, () => {
-    console.log(`Server ready!`);
-    setInterval(loop, 30000);
-});
+database.populate_cache((err, results) => {
+    if (err) {
+        console.log("Coulnt populate cache")
+        console.log(err)
+        return;
+    }
+
+    results.forEach(result => cache.push({
+        timestamp: moment().format('YYYY-MM-DD HH:mm:ss'),
+        temperature: Math.round(result.temperature*100)/100,
+        humidity: Math.round(result.humidity * 100) / 100,
+        feels_like: Math.round(new Feels({temp: result.temperature, humidity: result.humidity}).humidex() * 100) / 100
+    }))
+    app.listen(config.server.port, () => {
+        console.log(`Server ready!`);
+
+        setInterval(loop, 30000);
+    });
+})

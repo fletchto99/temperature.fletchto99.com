@@ -44,6 +44,18 @@ module.exports = {
                 callback(err)
             }
         });
+    },
+
+    populate_cache(callback) {
+        let query = `SELECT time_recorded, humidity, temperature FROM temperature ORDER BY id desc LIMIT 50;`
+
+        connection.query(query, (err, result) => {
+            if (!err) {
+                callback(null, result)
+            } else {
+                callback(err)
+            }
+        });
     }
 
 };
