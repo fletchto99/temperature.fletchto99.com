@@ -12,7 +12,7 @@
     "express": "^4.17.1",
     "express-ws": "^4.0.0",
     "feels": "^3.0.0",
-    "moment": "^2.29.1",
+    "moment": "^2.29.2",
     "mysql": "^2.18.1",
     "node-dht-sensor": "0.4.3",
     "onoff": "^6.0.3"
