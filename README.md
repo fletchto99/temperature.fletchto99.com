@@ -55,3 +55,11 @@ no production hostname is embedded in the frontend.
 - `GET /feels_like` returns the latest calculated humidex.
 
 The reading endpoints return HTTP 503 until the first reading is available.
+
+### Database-only mode
+
+Set `server.enabled` to `false` in `server/config.json` to disable the HTTP
+and WebSocket API entirely. The app then only polls the sensor and writes
+readings to the database — useful when another application consumes the data
+directly. When the API is enabled (the default when `enabled` is omitted),
+`server.port` must be configured.
