@@ -47,18 +47,6 @@ The hardware setup was based on this
 The browser derives the WebSocket host and protocol from the current page, so
 no production hostname is embedded in the frontend.
 
-## Existing database upgrade
-
-Older versions used columns that could not represent `100.0%` humidity,
-temperatures below `-9.9C`, or the application's two-decimal precision.
-Upgrade an existing table with:
-
-```sql
-ALTER TABLE temperature
-    MODIFY temperature DECIMAL(5, 2) NOT NULL,
-    MODIFY humidity DECIMAL(5, 2) NOT NULL;
-```
-
 ## Endpoints
 
 - `GET /health` returns server status and the in-memory reading count.
