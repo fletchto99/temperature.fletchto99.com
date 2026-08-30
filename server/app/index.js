@@ -1,6 +1,3 @@
-const express = require('express');
-const app = express();
-const socket = require('express-ws')(app);
 const sensor = require('./sensor');
 const database = require('./database');
 const {createReading} = require('./reading');
@@ -9,6 +6,11 @@ const config = require('../config.json');
 
 const cacheLimit = 50;
 const sampleInterval = config.sensor.intervalMs ?? 30000;
+const apiEnabled = config.server?.enabled ?? true;
+
+if (apiEnabled && !Number.isInteger(config.server?.port)) {
+    throw new Error('server.port must be configured when the API is enabled');
+}
 
 if (!Number.isFinite(sampleInterval) || sampleInterval < 2000) {
     throw new Error('sensor.intervalMs must be a number of at least 2000 milliseconds');
@@ -25,6 +27,17 @@ let readingInProgress = false;
 let shuttingDown = false;
 const initializedClients = new WeakSet();
 
+let app;
+let socket;
+
+if (apiEnabled) {
+    const express = require('express');
+    app = express();
+    socket = require('express-ws')(app);
+} else {
+    logger.info('API disabled by configuration; running in database-only mode');
+}
+
 function sendMessage(client, message) {
     if (client.readyState !== client.OPEN) {
         return;
@@ -38,6 +51,10 @@ function sendMessage(client, message) {
 }
 
 function broadcast(message) {
+    if (!socket) {
+        return;
+    }
+
     socket.getWss().clients.forEach((client) => {
         if (initializedClients.has(client)) {
             sendMessage(client, message);
@@ -67,16 +84,18 @@ async function pollSensor() {
             return;
         }
 
-        cache.push(reading);
+        if (apiEnabled) {
+            cache.push(reading);
 
-        if (cache.length > cacheLimit) {
-            cache.shift();
+            if (cache.length > cacheLimit) {
+                cache.shift();
+            }
+
+            broadcast({
+                message: 'update',
+                data: reading
+            });
         }
-
-        broadcast({
-            message: 'update',
-            data: reading
-        });
 
         try {
             await database.store(result.temperature, result.humidity);
@@ -101,69 +120,74 @@ function sendLatest(field, res) {
     res.type('text/plain').send(latest[field].toString());
 }
 
-app.get('/health', (req, res) => {
-    res.json({
-        status: 'ok',
-        readings: cache.length
-    });
-});
-
-app.get('/feels_like', (req, res) => {
-    sendLatest('feels_like', res);
-});
-
-app.get('/humidity', (req, res) => {
-    sendLatest('humidity', res);
-});
-
-app.get('/temperature', (req, res) => {
-    sendLatest('temperature', res);
-});
-
-app.ws('/', async (client) => {
-    try {
-        const extremes = await database.fetchExtremes();
-        const values = cache.slice();
-
-        sendMessage(client, {
-            message: 'initialize',
-            data: {
-                extremes,
-                values
-            }
+if (apiEnabled) {
+    app.get('/health', (req, res) => {
+        res.json({
+            status: 'ok',
+            readings: cache.length
         });
-        initializedClients.add(client);
-    } catch (error) {
-        logger.error('Failed to fetch temperature extremes', error);
-        client.close(1011, 'Failed to initialize');
-    }
-});
+    });
+
+    app.get('/feels_like', (req, res) => {
+        sendLatest('feels_like', res);
+    });
+
+    app.get('/humidity', (req, res) => {
+        sendLatest('humidity', res);
+    });
+
+    app.get('/temperature', (req, res) => {
+        sendLatest('temperature', res);
+    });
+
+    app.ws('/', async (client) => {
+        try {
+            const extremes = await database.fetchExtremes();
+            const values = cache.slice();
+
+            sendMessage(client, {
+                message: 'initialize',
+                data: {
+                    extremes,
+                    values
+                }
+            });
+            initializedClients.add(client);
+        } catch (error) {
+            logger.error('Failed to fetch temperature extremes', error);
+            client.close(1011, 'Failed to initialize');
+        }
+    });
+}
 
 async function start() {
     sensor.initialize();
 
-    const results = await database.populateCache();
+    if (apiEnabled) {
+        const results = await database.populateCache();
 
-    if (shuttingDown) {
-        return;
+        if (shuttingDown) {
+            return;
+        }
+
+        cache = results.map((result) => createReading(
+            result.temperature,
+            result.humidity,
+            result.time_recorded
+        ));
+
+        await new Promise((resolve, reject) => {
+            server = app.listen(config.server.port, resolve);
+            server.once('error', reject);
+        });
+
+        if (shuttingDown) {
+            return;
+        }
+
+        logger.info(`Server ready on port ${config.server.port}`);
     }
 
-    cache = results.map((result) => createReading(
-        result.temperature,
-        result.humidity,
-        result.time_recorded
-    ));
-
-    await new Promise((resolve, reject) => {
-        server = app.listen(config.server.port, resolve);
-        server.once('error', reject);
-    });
-
-    if (shuttingDown) {
-        return;
-    }
-
-    logger.info(`Server ready on port ${config.server.port}`);
     interval = setInterval(() => void pollSensor(), sampleInterval);
     void pollSensor();
 }
@@ -177,9 +201,11 @@ async function shutdown(signal) {
     logger.info(`Received ${signal}; shutting down`);
     clearInterval(interval);
 
-    socket.getWss().clients.forEach((client) => {
-        client.close(1001, 'Server shutting down');
-    });
+    if (socket) {
+        socket.getWss().clients.forEach((client) => {
+            client.close(1001, 'Server shutting down');
+        });
+    }
 
     let forceCloseTimer;
     let serverClosePromise = Promise.resolve();
