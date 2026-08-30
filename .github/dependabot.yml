@@ -8,6 +8,21 @@ updates:
     schedule:
       interval: "weekly"
     groups:
-      npm-dependencies:
+      routine-dependencies:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "node-dht-sensor"
+          - "onoff"
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      github-actions:
         patterns:
           - "*"

@@ -1,7 +1,7 @@
 {
     "sensor": {
         "gpio": 4,
-        "time": 10000
+        "intervalMs": 30000
     },
     "LED": {
         "gpio": 17

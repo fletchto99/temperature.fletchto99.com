@@ -1,14 +1,49 @@
-const sensorLib = require('node-dht-sensor');
 const config = require('../config.json').sensor;
 const LED = require('./LED');
 
-sensorLib.initialize(22, config.gpio);
+let sensorLib = null;
+let initialized = false;
 
 module.exports =  {
+    initialize() {
+        if (initialized) {
+            return;
+        }
+
+        LED.initialize();
+
+        try {
+            sensorLib = require('node-dht-sensor');
+
+            if (!sensorLib.initialize(22, config.gpio)) {
+                throw new Error('Failed to initialize DHT22 sensor');
+            }
+
+            initialized = true;
+        } catch (error) {
+            sensorLib = null;
+            LED.cleanup();
+            throw error;
+        }
+    },
+
     read() {
+        if (!initialized) {
+            throw new Error('Temperature sensor has not been initialized');
+        }
+
         LED.enable();
-        var readout = sensorLib.read();
-        LED.disable();
-        return readout;
+
+        try {
+            return sensorLib.read();
+        } finally {
+            LED.disable();
+        }
+    },
+
+    cleanup() {
+        initialized = false;
+        sensorLib = null;
+        LED.cleanup();
     }
 };

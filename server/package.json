@@ -1,19 +1,23 @@
 {
   "name": "temperature-sensor",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Raspberry Pi DHT22 temperature and humidity monitor",
+  "main": "temperature.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node temperature.js",
+    "check": "node --check temperature.js && node --check app/index.js && node --check app/database.js && node --check app/LED.js && node --check app/reading.js && node --check app/sensor.js && node --check test/reading.test.js && node --check ../web/resources/js/temperature.js",
+    "test": "node --test"
   },
   "author": "",
   "license": "ISC",
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "express": "^5.2.1",
-    "express-ws": "^4.0.0",
+    "express-ws": "^5.0.2",
     "feels": "^3.0.0",
-    "moment": "^2.29.4",
-    "mysql": "^2.18.1",
+    "mysql2": "^3.24.2",
     "node-dht-sensor": "0.4.3",
     "onoff": "^6.0.3"
   }

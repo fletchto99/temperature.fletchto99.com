@@ -1,6 +1,5 @@
-window.onload = function() {
-
-    var chart = c3.generate({
+window.onload = function () {
+    const chart = c3.generate({
         bindto: '#chart',
         data: {
             x: 'time',
@@ -19,10 +18,10 @@ window.onload = function() {
                 temperature: 'y',
                 feels_like: 'y',
                 humidity: 'y2'
-            },
-            size: {
-                height: 800
             }
+        },
+        size: {
+            height: 800
         },
         axis: {
             x: {
@@ -40,7 +39,7 @@ window.onload = function() {
                 min: -100,
                 max: 100,
                 label: {
-                    text: 'Temperature (\xB0c)',
+                    text: 'Temperature (\xB0C)',
                     position: 'outer-middle'
                 }
             },
@@ -61,81 +60,138 @@ window.onload = function() {
         tooltip: {
             format: {
                 value: function (value, ratio, id) {
-                    return value + (id == 'humidity' ? '%' : '\xB0c');
+                    return value + (id === 'humidity' ? '%' : '\xB0C');
                 }
             }
         }
     });
 
-    let set_extreme = (type, extreme, value, delimiter, date) => {
-        document.getElementById(`${type}${extreme}`).innerText = `${type} ${extreme} of ${value}${delimiter} recorded on ${new Date(date).toLocaleString()}`
+    let maxTemperature = null;
+    let minTemperature = null;
+    let maxHumidity = null;
+    let minHumidity = null;
+    let reconnectTimer = null;
+
+    function setExtreme(type, metric, value, unit, date) {
+        document.getElementById(`${type}${metric}`).innerText =
+            `${metric} ${type.toLowerCase()} of ${value}${unit} recorded on ${new Date(date).toLocaleString()}`;
     }
 
-    let socket = new WebSocket("wss://temperature.fletchto99.com/api/");
-    let max_temp = null;
-    let min_temp = null;
-    let max_humid = null;
-    let min_humid = null;
-
-
-    socket.onmessage = function (message) {
-        var msg = JSON.parse(message.data);
-
-        if (msg.message == 'update') {
-            chart.flow({
-                columns: [
-                    ['time', msg.data.timestamp],
-                    ['temperature', msg.data.temperature],
-                    ['feels_like', msg.data.feels_like],
-                    ['humidity', msg.data.humidity]
-                ],
-                length: (chart.data.values('temperature').length > 50) ? 1 : 0
-            });
-
-            document.title = `${msg.data.feels_like} / ${msg.data.humidity}`;
-
-            if (msg.data.temperature > max_temp.temperature) {
-                set_extreme("Max", "temperature", msg.data.temperature, "c", msg.data.time)
-            }
-
-            if (msg.data.temperature < min_temp.temperature) {
-                set_extreme("Min", "temperature", msg.data.temperature, "c", msg.data.time)
-            }
-
-            if (msg.data.humidity > max_humid.humidity) {
-                set_extreme("Max", "humidity", msg.data.humidity, "%", msg.data.time)
-            }
-
-            if (msg.data.humidity < min_humid.humidity) {
-                set_extreme("Min", "humidity", msg.data.humidity, "%", msg.data.time)
-            }
-
-        } else if (msg.message == 'initialize') {
-            max_temp = msg.data["extremes"][0][0]
-            min_temp = msg.data["extremes"][1][0]
-            max_humid = msg.data["extremes"][2][0]
-            min_humid = msg.data["extremes"][3][0]
-            set_extreme("Max", "temperature", max_temp.temperature, "c", max_temp.time_recorded)
-            set_extreme("Min", "temperature", min_temp.temperature, "c", min_temp.time_recorded)
-            set_extreme("Max", "humidity", max_humid.humidity, "%", max_humid.time_recorded)
-            set_extreme("Min", "humidity", min_humid.humidity, "%", min_humid.time_recorded)
-
-            chart.load({
-                columns: [
-                    ['time'].concat(msg.data.values.map(function (item) {
-                        return item.timestamp
-                    })),
-                    ['temperature'].concat(msg.data.values.map(function (item) {
-                        return item.temperature
-                    })),
-                    ['feels_like'].concat(msg.data.values.map(function (item) {
-                        return item.feels_like;
-                    })),
-                    ['humidity'].concat(msg.data.values.map(function (item) {
-                        return item.humidity
-                    }))
-                ]
-            })
+    function setInitialExtreme(type, metric, reading, unit) {
+        if (reading) {
+            setExtreme(type, metric, reading[metric], unit, reading.time_recorded);
         }
     }
+
+    function updateExtremes(reading) {
+        if (!maxTemperature || reading.temperature > maxTemperature.temperature) {
+            maxTemperature = {
+                temperature: reading.temperature,
+                time_recorded: reading.timestamp
+            };
+            setExtreme('Max', 'temperature', reading.temperature, '\xB0C', reading.timestamp);
+        }
+
+        if (!minTemperature || reading.temperature < minTemperature.temperature) {
+            minTemperature = {
+                temperature: reading.temperature,
+                time_recorded: reading.timestamp
+            };
+            setExtreme('Min', 'temperature', reading.temperature, '\xB0C', reading.timestamp);
+        }
+
+        if (!maxHumidity || reading.humidity > maxHumidity.humidity) {
+            maxHumidity = {
+                humidity: reading.humidity,
+                time_recorded: reading.timestamp
+            };
+            setExtreme('Max', 'humidity', reading.humidity, '%', reading.timestamp);
+        }
+
+        if (!minHumidity || reading.humidity < minHumidity.humidity) {
+            minHumidity = {
+                humidity: reading.humidity,
+                time_recorded: reading.timestamp
+            };
+            setExtreme('Min', 'humidity', reading.humidity, '%', reading.timestamp);
+        }
+    }
+
+    function initialize(data) {
+        maxTemperature = data.extremes[0]?.[0] ?? null;
+        minTemperature = data.extremes[1]?.[0] ?? null;
+        maxHumidity = data.extremes[2]?.[0] ?? null;
+        minHumidity = data.extremes[3]?.[0] ?? null;
+
+        setInitialExtreme('Max', 'temperature', maxTemperature, '\xB0C');
+        setInitialExtreme('Min', 'temperature', minTemperature, '\xB0C');
+        setInitialExtreme('Max', 'humidity', maxHumidity, '%');
+        setInitialExtreme('Min', 'humidity', minHumidity, '%');
+
+        chart.load({
+            columns: [
+                ['time'].concat(data.values.map((item) => item.timestamp)),
+                ['temperature'].concat(data.values.map((item) => item.temperature)),
+                ['feels_like'].concat(data.values.map((item) => item.feels_like)),
+                ['humidity'].concat(data.values.map((item) => item.humidity))
+            ]
+        });
+
+        const latest = data.values.at(-1);
+        if (latest) {
+            document.title = `${latest.feels_like}\xB0C / ${latest.humidity}%`;
+        }
+
+        data.values.forEach(updateExtremes);
+    }
+
+    function handleUpdate(reading) {
+        chart.flow({
+            columns: [
+                ['time', reading.timestamp],
+                ['temperature', reading.temperature],
+                ['feels_like', reading.feels_like],
+                ['humidity', reading.humidity]
+            ],
+            length: chart.data.values('temperature').length > 50 ? 1 : 0
+        });
+
+        document.title = `${reading.feels_like}\xB0C / ${reading.humidity}%`;
+        updateExtremes(reading);
+    }
+
+    function connect() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const client = new WebSocket(`${protocol}//${window.location.host}/api/`);
+
+        client.onopen = function () {
+            window.clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        };
+
+        client.onmessage = function (message) {
+            const data = JSON.parse(message.data);
+
+            if (data.message === 'update') {
+                handleUpdate(data.data);
+            } else if (data.message === 'initialize') {
+                initialize(data.data);
+            }
+        };
+
+        client.onerror = function () {
+            client.close();
+        };
+
+        client.onclose = function () {
+            if (reconnectTimer === null) {
+                reconnectTimer = window.setTimeout(function () {
+                    reconnectTimer = null;
+                    connect();
+                }, 5000);
+            }
+        };
+    }
+
+    connect();
 };
