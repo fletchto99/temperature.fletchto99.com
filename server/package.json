@@ -10,11 +10,11 @@
   "license": "ISC",
   "dependencies": {
     "express": "^5.2.1",
-    "express-ws": "^4.0.0",
+    "express-ws": "^5.0.2",
     "feels": "^3.0.0",
-    "moment": "^2.29.4",
+    "moment": "^2.30.1",
     "mysql": "^2.18.1",
-    "node-dht-sensor": "0.4.3",
+    "node-dht-sensor": "0.5.4",
     "onoff": "^6.0.3"
   }
 }
