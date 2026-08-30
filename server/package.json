@@ -5,7 +5,7 @@
   "main": "temperature.js",
   "scripts": {
     "start": "node temperature.js",
-    "check": "node --check temperature.js && node --check app/index.js && node --check app/database.js && node --check app/LED.js && node --check app/reading.js && node --check app/sensor.js && node --check test/reading.test.js && node --check ../web/resources/js/temperature.js",
+    "check": "node --check temperature.js && node --check app/index.js && node --check app/database.js && node --check app/LED.js && node --check app/logger.js && node --check app/reading.js && node --check app/sensor.js && node --check test/reading.test.js && node --check ../web/resources/js/temperature.js",
     "test": "node --test"
   },
   "author": "",

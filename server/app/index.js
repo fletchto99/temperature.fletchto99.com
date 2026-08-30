@@ -4,6 +4,7 @@ const socket = require('express-ws')(app);
 const sensor = require('./sensor');
 const database = require('./database');
 const {createReading} = require('./reading');
+const logger = require('./logger');
 const config = require('../config.json');
 
 const cacheLimit = 50;
@@ -14,7 +15,7 @@ if (!Number.isFinite(sampleInterval) || sampleInterval < 2000) {
 }
 
 if (config.sensor.intervalMs === undefined) {
-    console.warn('sensor.intervalMs is not configured; using 30000 milliseconds');
+    logger.warn('sensor.intervalMs is not configured; using 30000 milliseconds');
 }
 
 let cache = [];
@@ -31,7 +32,7 @@ function sendMessage(client, message) {
 
     client.send(JSON.stringify(message), (error) => {
         if (error) {
-            console.error('Failed to send WebSocket message', error);
+            logger.error('Failed to send WebSocket message', error);
         }
     });
 }
@@ -46,7 +47,7 @@ function broadcast(message) {
 
 async function pollSensor() {
     if (readingInProgress) {
-        console.warn('Skipping sensor poll because the previous poll is still running');
+        logger.warn('Skipping sensor poll because the previous poll is still running');
         return;
     }
 
@@ -56,7 +57,7 @@ async function pollSensor() {
         const result = sensor.read();
 
         if (!result.isValid) {
-            console.warn('Sensor returned an invalid reading');
+            logger.warn('Sensor returned an invalid reading');
             return;
         }
 
@@ -80,10 +81,10 @@ async function pollSensor() {
         try {
             await database.store(result.temperature, result.humidity);
         } catch (error) {
-            console.error('Failed to persist sensor reading', error);
+            logger.error('Failed to persist sensor reading', error);
         }
     } catch (error) {
-        console.error('Failed to read from the temperature sensor', error);
+        logger.error('Failed to read from the temperature sensor', error);
     } finally {
         readingInProgress = false;
     }
@@ -133,7 +134,7 @@ app.ws('/', async (client) => {
         });
         initializedClients.add(client);
     } catch (error) {
-        console.error('Failed to fetch temperature extremes', error);
+        logger.error('Failed to fetch temperature extremes', error);
         client.close(1011, 'Failed to initialize');
     }
 });
@@ -162,7 +163,7 @@ async function start() {
         return;
     }
 
-    console.log(`Server ready on port ${config.server.port}`);
+    logger.info(`Server ready on port ${config.server.port}`);
     interval = setInterval(() => void pollSensor(), sampleInterval);
     void pollSensor();
 }
@@ -173,7 +174,7 @@ async function shutdown(signal) {
     }
 
     shuttingDown = true;
-    console.log(`Received ${signal}; shutting down`);
+    logger.info(`Received ${signal}; shutting down`);
     clearInterval(interval);
 
     socket.getWss().clients.forEach((client) => {
@@ -187,7 +188,7 @@ async function shutdown(signal) {
         serverClosePromise = new Promise((resolve) => {
             server.close((error) => {
                 if (error) {
-                    console.error('Failed to close HTTP server cleanly', error);
+                    logger.error('Failed to close HTTP server cleanly', error);
                     process.exitCode = 1;
                 }
                 resolve();
@@ -202,14 +203,14 @@ async function shutdown(signal) {
     try {
         sensor.cleanup();
     } catch (error) {
-        console.error('Failed to release GPIO resources', error);
+        logger.error('Failed to release GPIO resources', error);
         process.exitCode = 1;
     }
 
     try {
         await database.close();
     } catch (error) {
-        console.error('Failed to close database connections', error);
+        logger.error('Failed to close database connections', error);
         process.exitCode = 1;
     }
 
@@ -225,18 +226,18 @@ start().catch(async (error) => {
         return;
     }
 
-    console.error('Failed to start temperature server', error);
+    logger.error('Failed to start temperature server', error);
     process.exitCode = 1;
 
     try {
         sensor.cleanup();
     } catch (cleanupError) {
-        console.error('Failed to release GPIO resources after startup error', cleanupError);
+        logger.error('Failed to release GPIO resources after startup error', cleanupError);
     }
 
     try {
         await database.close();
     } catch (cleanupError) {
-        console.error('Failed to close database connections after startup error', cleanupError);
+        logger.error('Failed to close database connections after startup error', cleanupError);
     }
 });
