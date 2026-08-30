@@ -13,6 +13,10 @@
   "engines": {
     "node": ">=18"
   },
+  "allowScripts": {
+    "epoll@4.0.1": true,
+    "node-dht-sensor@0.5.4": true
+  },
   "dependencies": {
     "express": "^5.2.1",
     "express-ws": "^5.0.2",
