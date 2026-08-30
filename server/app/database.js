@@ -1,61 +1,59 @@
-const mysql = require('mysql');
+const mysql = require('mysql2/promise');
+const config = require('../config.json').database;
 
-let config = require('../config.json').database;
-let connection = mysql.createConnection({
-    ...config,
-    multipleStatements: true
+const pool = mysql.createPool({
+    waitForConnections: true,
+    connectionLimit: 4,
+    ...config
 });
 
 module.exports = {
 
-    store(temperature, humidity) {
-        if (!temperature || !humidity) {
-            console.log(temperature);
-            console.log(humidity);
-            console.log("Temperature or humidity not valid");
-            return;
+    async store(temperature, humidity) {
+        const parsedTemperature = Number(temperature);
+        const parsedHumidity = Number(humidity);
+
+        if (!Number.isFinite(parsedTemperature) || !Number.isFinite(parsedHumidity)) {
+            throw new TypeError('Temperature and humidity must be finite numbers');
         }
 
-        temperature = parseFloat(temperature);
-        humidity = parseFloat(humidity);
-
-        connection.query('INSERT INTO temperature SET ? ', {
-            temperature: temperature,
-            humidity: humidity
-        }, (err) => {
-            if (err) {
-                console.log(err);
-            }
-        });
+        await pool.execute(
+            'INSERT INTO temperature (temperature, humidity) VALUES (?, ?)',
+            [parsedTemperature, parsedHumidity]
+        );
     },
 
-    fetch_extremes(callback) {
-        let query = `
-            SELECT time_recorded, humidity, temperature FROM temperature ORDER BY temperature desc LIMIT 1;
-            SELECT time_recorded, humidity, temperature FROM temperature ORDER BY temperature asc LIMIT 1;
-            SELECT time_recorded, humidity, temperature FROM temperature ORDER BY humidity desc LIMIT 1;
-            SELECT time_recorded, humidity, temperature FROM temperature ORDER BY humidity asc LIMIT 1;
-        `
+    async fetchExtremes() {
+        const queries = [
+            'SELECT time_recorded, humidity, temperature FROM temperature ORDER BY temperature DESC LIMIT 1',
+            'SELECT time_recorded, humidity, temperature FROM temperature ORDER BY temperature ASC LIMIT 1',
+            'SELECT time_recorded, humidity, temperature FROM temperature ORDER BY humidity DESC LIMIT 1',
+            'SELECT time_recorded, humidity, temperature FROM temperature ORDER BY humidity ASC LIMIT 1'
+        ];
 
-        connection.query(query, (err, result) => {
-            if (!err) {
-                callback(null, result)
-            } else {
-                callback(err)
-            }
-        });
+        return Promise.all(queries.map(async (query) => {
+            const [rows] = await pool.query(query);
+            return rows;
+        }));
     },
 
-    populate_cache(callback) {
-        let query = `SELECT time_recorded, humidity, temperature FROM temperature ORDER BY id desc LIMIT 50;`
+    async populateCache() {
+        const [rows] = await pool.query(`
+            SELECT time_recorded, humidity, temperature
+            FROM (
+                SELECT id, time_recorded, humidity, temperature
+                FROM temperature
+                ORDER BY id DESC
+                LIMIT 50
+            ) AS recent_readings
+            ORDER BY id ASC
+        `);
 
-        connection.query(query, (err, result) => {
-            if (!err) {
-                callback(null, result)
-            } else {
-                callback(err)
-            }
-        });
+        return rows;
+    },
+
+    async close() {
+        await pool.end();
     }
 
 };

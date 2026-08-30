@@ -1,16 +1,69 @@
 # Temperature Sensor
-----
 
-A simple program to monitor the temperature inside of my room using the DHT-22 sensor for the raspberry PI. I've also set it up so that an LED will blink each time the PI is detecting the temperature. You can view the pin diagram I used here: 
+A small Raspberry Pi application that reads temperature and humidity from a
+DHT22 sensor, stores readings in MySQL, and streams them to a browser over a
+WebSocket. An LED blinks whenever the sensor is read.
 
-![pin layour](https://github.com/fletchto99/termperature.fletchto99.com/raw/master/images/layout.png "pin layout")
+![GPIO pin layout](images/layout.png)
 
-I followed this [youtube tutorial](https://www.youtube.com/watch?v=IHTnU1T8ETk) to hook up all of the hardware.
+The hardware setup was based on this
+[YouTube tutorial](https://www.youtube.com/watch?v=IHTnU1T8ETk).
 
-### Setup Instructions
+## Requirements
 
-1. Prepare the hardware as seen above.
-2. Setup a MySQL DB as per the `server/table.sql` file.
-3. Setup a `config.json` for the server using the layout of `config.sample.json`
-4. Point the `API_URL` in `web/resource/js/temperature.js` to the server side API
+- Raspberry Pi with a DHT22 sensor and LED
+- Node.js 18 or later (Node.js 22 is the recommended and pinned runtime)
+- MySQL
+- A web server or reverse proxy capable of serving `web/` and proxying
+  WebSockets
 
+## Setup
+
+1. Connect the hardware using the pin layout above.
+2. Create the database and table:
+
+   ```sh
+   mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS Temperature"
+   mysql -u root -p Temperature < database.sql
+   ```
+
+3. Install the server dependencies:
+
+   ```sh
+   cd server
+   npm ci
+   ```
+
+4. Copy `server/config.sample.json` to `server/config.json` and configure the
+   GPIO pins, polling interval, server port, and database credentials.
+5. Configure the reverse proxy so `/api/` forwards WebSocket and HTTP traffic
+   to the configured server port.
+6. Start the sensor server:
+
+   ```sh
+   npm start
+   ```
+
+The browser derives the WebSocket host and protocol from the current page, so
+no production hostname is embedded in the frontend.
+
+## Existing database upgrade
+
+Older versions used columns that could not represent `100.0%` humidity,
+temperatures below `-9.9C`, or the application's two-decimal precision.
+Upgrade an existing table with:
+
+```sql
+ALTER TABLE temperature
+    MODIFY temperature DECIMAL(5, 2) NOT NULL,
+    MODIFY humidity DECIMAL(5, 2) NOT NULL;
+```
+
+## Endpoints
+
+- `GET /health` returns server status and the in-memory reading count.
+- `GET /temperature` returns the latest temperature.
+- `GET /humidity` returns the latest humidity.
+- `GET /feels_like` returns the latest calculated humidex.
+
+The reading endpoints return HTTP 503 until the first reading is available.
