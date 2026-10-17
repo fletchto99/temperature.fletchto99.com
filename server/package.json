@@ -18,10 +18,10 @@
     "node-dht-sensor@0.5.4": true
   },
   "dependencies": {
-    "express": "^5.2.1",
+    "express": "^5.3.0",
     "express-ws": "^5.0.2",
     "feels": "^3.0.0",
-    "mysql2": "^3.24.5",
+    "mysql2": "^3.24.6",
     "node-dht-sensor": "0.5.5",
     "onoff": "^6.0.3"
   }
